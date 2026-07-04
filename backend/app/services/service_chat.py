@@ -30,7 +30,7 @@ def _detect_intent(msg: str) -> str:
     m = msg.lower()
 
     # Cliente específico — prioridad máxima
-    if re.search(r"cli[-\s]?\d+", m):
+    if re.search(r"(?:cli(?:ente)?)\s*(?:id|n[uú]mero|#)?\s*[-:\s]?\s*(\d+)", m):
         return "cliente"
 
     # Simulación
@@ -74,12 +74,10 @@ def _detect_intent(msg: str) -> str:
 
 
 def _extract_client_id(msg: str) -> str:
-    match = re.search(r"(cli[-\s]?\d+)", msg.lower())
+    # Busca patrones como "cli-0003", "cliente 3", "cliente id 3", "cliente numero 3"
+    match = re.search(r"(?:cli(?:ente)?)\s*(?:id|n[uú]mero|#)?\s*[-:\s]?\s*(\d+)", msg.lower())
     if match:
-        raw = match.group(1).replace(" ", "").upper()
-        # normalizar a CLI-XXXX
-        digits = re.sub(r"\D", "", raw)
-        return f"CLI-{digits.zfill(4)}"
+        return str(int(match.group(1)))
     return ""
 
 
@@ -95,7 +93,7 @@ _GENERAL_RESPONSES: dict[str, str] = {
     "churn":      "El Churn es la tasa de abandono de clientes. Puedes preguntarme: '¿cuántos clientes tienen riesgo alto?' o 'Resume el estado del negocio'.",
     "arpu":       "El ARPU (Average Revenue Per User) es el ingreso promedio por cliente activo. Pregúntame: '¿Cuál es el ARPU promedio?' para ver el valor actual.",
     "mttr":       "El MTTR mide el tiempo promedio en resolver averías. Es una de las variables más importantes del modelo. Prueba: '¿Qué ocurriría si reducimos el MTTR?'",
-    "ayuda":      "Puedo ayudarte a:\n• Analizar KPIs del negocio\n• Comparar segmentos o departamentos\n• Analizar un cliente específico (ej: 'Analiza el cliente CLI-0042')\n• Ejecutar simulaciones\n• Explicar el modelo IA\n• Generar recomendaciones estratégicas",
+    "ayuda":      "Puedo ayudarte a:\n• Analizar KPIs del negocio\n• Comparar segmentos o departamentos\n• Analizar un cliente específico (ej: 'Analiza al cliente 3')\n• Ejecutar simulaciones\n• Explicar el modelo IA\n• Generar recomendaciones estratégicas",
 }
 
 _DEFAULT = (
@@ -103,7 +101,7 @@ _DEFAULT = (
     "• Estado del negocio y KPIs\n"
     "• Clientes en riesgo alto\n"
     "• Comparar segmentos o departamentos\n"
-    "• Analizar un cliente: 'Analiza el cliente CLI-0042'\n"
+    "• Analizar un cliente: 'Analiza al cliente 3'\n"
     "• Simulaciones: '¿Qué ocurriría si reducimos el MTTR?'\n"
     "• Recomendaciones estratégicas\n"
     "• Variables del modelo XGBoost"

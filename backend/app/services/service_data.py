@@ -176,7 +176,7 @@ def _build_df_model() -> pd.DataFrame:
     df["num_reclamos"]  = df["num_reclamos"].fillna(0).astype(int)
     df["total_averias"] = df["total_averias"].fillna(0).astype(int)
     df["mttr_prom"]     = df["mttr_prom"].fillna(0).clip(0, 500)
-    df["sat_media"]     = df["sat_media"].fillna(5.0)
+    df["sat_media"]     = df["sat_media"].fillna(0)
     df["arpu"]          = df["arpu"].fillna(0.0)
     df["pct_venc"]      = df["pct_venc"].fillna(0.0).clip(0, 100)
     df["deuda_promedio"] = df["deuda_promedio"].fillna(0.0)

@@ -30,25 +30,26 @@ const NUM_FIELDS: Field[] = [
   { key: "arpu",             label: "ARPU promedio (S/.)",      min: 0,   step: 0.1 },
   { key: "pct_venc",         label: "% facturas vencidas",      min: 0,   max: 100, step: 0.1 },
   { key: "total_averias",    label: "Total averías",            min: 0,   step: 1   },
-  { key: "deuda_promedio",   label: "Deuda promedio (días)",    min: 0,   step: 0.1 },
+  { key: "deuda_promedio",   label: "Deuda promedio",    min: 0,   step: 0.1 },
   { key: "max_dias_atraso",  label: "Máx días de atraso",       min: 0,   step: 1   },
 ];
 
 function RiskGauge({ probability }: { probability: number }) {
-  const pct = Math.round(probability * 100);
-  const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-400" : "bg-green-500";
+  const pctNum = probability * 100;
+  const pctStr = pctNum.toFixed(2);
+  const color = pctNum >= 70 ? "bg-red-500" : pctNum >= 40 ? "bg-amber-400" : "bg-green-500";
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-sm font-medium">
         <span className="text-gray-600">Probabilidad de Churn</span>
-        <span className={pct >= 70 ? "text-red-600" : pct >= 40 ? "text-amber-600" : "text-green-600"}>
-          {pct}%
+        <span className={pctNum >= 70 ? "text-red-600" : pctNum >= 40 ? "text-amber-600" : "text-green-600"}>
+          {pctStr}%
         </span>
       </div>
       <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-700 ${color}`}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${pctNum}%` }}
         />
       </div>
       <div className="flex justify-between text-xs text-gray-400">
