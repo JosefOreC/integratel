@@ -25,7 +25,8 @@ import pandas as pd
 # ─────────────────────────────────────────────────────────────────────────────
 # RUTA POR DEFECTO DEL DW
 # ─────────────────────────────────────────────────────────────────────────────
-_DEFAULT_DW_PATH = Path(__file__).parent.parent.parent / "Integratel_dw.xlsx"
+_DEFAULT_DW_PKL_PATH = Path(__file__).parent.parent.parent / "Integratel_dw.pkl"
+_DEFAULT_DW_XLSX_PATH = Path(__file__).parent.parent.parent / "Integratel_dw.xlsx"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ESTADO GLOBAL (Singleton thread-safe)
@@ -53,10 +54,10 @@ _load_error: str = ""
 # ─────────────────────────────────────────────────────────────────────────────
 # FUNCIÓN PRINCIPAL DE CARGA
 # ─────────────────────────────────────────────────────────────────────────────
-def load_dw(source: bytes | Path | None = None) -> dict:
+def load_dw(source: bytes | Path | str | None = None) -> dict:
     """
     Carga el Data Warehouse desde bytes (subida por usuario) o desde
-    la ruta por defecto en disco.
+    la ruta por defecto en disco (.pkl o .xlsx).
 
     Retorna un dict con status, filas por tabla y resumen del df_model.
     """
@@ -66,26 +67,50 @@ def load_dw(source: bytes | Path | None = None) -> dict:
 
     with _lock:
         try:
-            # ── 1. Abrir el ExcelFile ──────────────────────────────────────
+            # ── 1. Abrir y leer hojas ──────────────────────────────────────
             if isinstance(source, bytes):
                 xl = pd.ExcelFile(io.BytesIO(source))
                 _dw_file = "upload"
+                dim_tiempo   = pd.read_excel(xl, "DIM_TIEMPO")
+                dim_cliente  = pd.read_excel(xl, "DIM_CLIENTE")
+                dim_producto = pd.read_excel(xl, "DIM_PRODUCTO")
+                fact_fact    = pd.read_excel(xl, "FACT_FACTURACION")
+                fact_av      = pd.read_excel(xl, "FACT_AVERIAS")
+                fact_churn   = pd.read_excel(xl, "FACT_CHURN")
+                fact_red     = pd.read_excel(xl, "FACT_USO_RED")
             else:
-                path = source or _DEFAULT_DW_PATH
-                if not Path(path).exists():
+                if source is not None:
+                    path = Path(source)
+                else:
+                    # Preferir el .pkl por velocidad extrema (especial para Render)
+                    path = _DEFAULT_DW_PKL_PATH if _DEFAULT_DW_PKL_PATH.exists() else _DEFAULT_DW_XLSX_PATH
+                
+                if not path.exists():
                     _load_error = f"Archivo no encontrado: {path}"
                     return {"status": "error", "message": _load_error}
-                xl = pd.ExcelFile(path)
+                
                 _dw_file = str(path)
-
-            # ── 2. Leer hojas ──────────────────────────────────────────────
-            dim_tiempo   = pd.read_excel(xl, "DIM_TIEMPO")
-            dim_cliente  = pd.read_excel(xl, "DIM_CLIENTE")
-            dim_producto = pd.read_excel(xl, "DIM_PRODUCTO")
-            fact_fact    = pd.read_excel(xl, "FACT_FACTURACION")
-            fact_av      = pd.read_excel(xl, "FACT_AVERIAS")
-            fact_churn   = pd.read_excel(xl, "FACT_CHURN")
-            fact_red     = pd.read_excel(xl, "FACT_USO_RED")
+                
+                if str(path).endswith(".pkl"):
+                    import pickle
+                    with open(path, "rb") as f:
+                        data = pickle.load(f)
+                    dim_tiempo   = data.get("DIM_TIEMPO")
+                    dim_cliente  = data.get("DIM_CLIENTE")
+                    dim_producto = data.get("DIM_PRODUCTO")
+                    fact_fact    = data.get("FACT_FACTURACION")
+                    fact_av      = data.get("FACT_AVERIAS")
+                    fact_churn   = data.get("FACT_CHURN")
+                    fact_red     = data.get("FACT_USO_RED")
+                else:
+                    xl = pd.ExcelFile(path)
+                    dim_tiempo   = pd.read_excel(xl, "DIM_TIEMPO")
+                    dim_cliente  = pd.read_excel(xl, "DIM_CLIENTE")
+                    dim_producto = pd.read_excel(xl, "DIM_PRODUCTO")
+                    fact_fact    = pd.read_excel(xl, "FACT_FACTURACION")
+                    fact_av      = pd.read_excel(xl, "FACT_AVERIAS")
+                    fact_churn   = pd.read_excel(xl, "FACT_CHURN")
+                    fact_red     = pd.read_excel(xl, "FACT_USO_RED")
 
             # Normalizar columna año
             if "año" not in fact_av.columns and "id_tiempo" in fact_av.columns:
