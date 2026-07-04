@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Brain, AlertTriangle, CheckCircle, Info, Loader2 } from "lucide-react";
+import { Brain, AlertTriangle, CheckCircle, Info, Loader2, Search } from "lucide-react";
 import { predict } from "../services/predict";
+import api from "../services/api";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { ErrorAlert } from "../components/ui/ErrorAlert";
@@ -26,9 +27,9 @@ const NUM_FIELDS: Field[] = [
   { key: "num_reclamos",     label: "N° de reclamos",           min: 0,   step: 1   },
   { key: "mttr_prom",        label: "MTTR promedio (min)",      min: 0,   step: 1   },
   { key: "sat_media",        label: "Satisfacción (1-10)",      min: 1,   max: 10,  step: 0.1 },
-  { key: "total_averias",    label: "Total averías",            min: 0,   step: 1   },
   { key: "arpu",             label: "ARPU promedio (S/.)",      min: 0,   step: 0.1 },
   { key: "pct_venc",         label: "% facturas vencidas",      min: 0,   max: 100, step: 0.1 },
+  { key: "total_averias",    label: "Total averías",            min: 0,   step: 1   },
   { key: "deuda_promedio",   label: "Deuda promedio (días)",    min: 0,   step: 0.1 },
   { key: "max_dias_atraso",  label: "Máx días de atraso",       min: 0,   step: 1   },
 ];
@@ -59,6 +60,8 @@ function RiskGauge({ probability }: { probability: number }) {
 
 export function PrediccionPage() {
   const [form, setForm]       = useState<PredictInput>(INITIAL);
+  const [searchId, setSearchId] = useState("");
+  const [searching, setSearching] = useState(false);
   const [result, setResult]   = useState<PredictResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -81,6 +84,34 @@ export function PrediccionPage() {
     }
   };
 
+  const handleSearch = async () => {
+    if (!searchId.trim()) return;
+    setSearching(true);
+    setError("");
+    try {
+      const res = await api.get(`/clients/${searchId.trim()}`);
+      const c = res.data.data;
+      setForm({
+        antiguedad_meses: c.antiguedad_meses,
+        num_reclamos: c.num_reclamos,
+        mttr_prom: c.mttr_prom,
+        sat_media: c.sat_media,
+        total_averias: c.total_averias,
+        arpu: c.arpu,
+        pct_venc: c.pct_venc,
+        deuda_promedio: c.deuda_promedio,
+        max_dias_atraso: c.max_dias_atraso,
+        segmento: c.segmento,
+        departamento: c.departamento,
+      });
+      setResult(null);
+    } catch {
+      setError(`Cliente ${searchId} no encontrado en el DW.`);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const riskVariant = (risk: string) =>
     risk === "ALTO" ? "danger" : risk === "MEDIO" ? "warning" : "success";
 
@@ -95,7 +126,30 @@ export function PrediccionPage() {
           </div>
         </CardHeader>
 
-        <form id="predict-form" onSubmit={handleSubmit} className="space-y-3">
+        <div className="px-5 pt-4 pb-2 border-b border-gray-100 flex gap-2 items-end">
+          <div className="flex-1">
+            <label className="label">Cargar cliente real del Data Warehouse (ID)</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="Ej: 1, 2, 3..."
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn-primary px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white border-transparent"
+            onClick={handleSearch}
+            disabled={searching || !searchId}
+          >
+            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Buscar
+          </button>
+        </div>
+
+        <form id="predict-form" onSubmit={handleSubmit} className="space-y-3 p-5 pt-3">
           <div className="grid grid-cols-2 gap-3">
             {NUM_FIELDS.map(({ key, label, min, max, step }) => (
               <div key={key}>

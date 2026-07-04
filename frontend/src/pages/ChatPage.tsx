@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, MessageSquare } from "lucide-react";
+import { Send, Bot, User } from "lucide-react";
 import { sendChat } from "../services/chat";
 import type { ChatMessage } from "../types";
 
@@ -10,14 +10,14 @@ const FAQ_BUTTONS = [
   "¿Qué variables influyen más en el churn?",
   "¿Qué ocurriría si reducimos el MTTR?",
   "¿Qué recomendaciones estratégicas hay?",
-  "Analiza el cliente CLI-0002",
+  "Analiza el cliente 2",
   "¿Qué tendencias observas?",
 ];
 
 const WELCOME: ChatMessage = {
   id:        "0",
   role:      "assistant",
-  content:   "Hola 👋 Soy el Asistente BI+AI de Integratel Perú.\n\nPuedo analizar clientes, interpretar KPIs, ejecutar predicciones con el modelo XGBoost y generar recomendaciones estratégicas basadas en datos reales del sistema.\n\nPrueba preguntarme: 'Resume el estado del negocio' o 'Analiza el cliente CLI-0042'.",
+  content:   "Hola 👋 Soy el Asistente BI+AI de Integratel Perú.\n\nPuedo analizar clientes, interpretar KPIs, ejecutar predicciones con el modelo XGBoost y generar recomendaciones estratégicas basadas en datos reales del sistema.\n\nPrueba preguntarme: 'Resume el estado del negocio' o 'Analiza el cliente 42'.",
   timestamp: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
 };
 

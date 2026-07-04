@@ -27,7 +27,7 @@ from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
 # ─── Configuración ──────────────────────────────────────────────
-EXCEL_PATH = Path("Integratel_dw.xlsx")          # ← actualiza si el nombre difiere
+EXCEL_PATH = Path("D:\DESARROLLO_APLICACIONES\Python\in//backend\Integratel_dw.xlsx")          # ← actualiza si el nombre difiere
 OUTPUT_PATH = Path(__file__).parent / "app" / "ml" / "model.joblib"
 # ────────────────────────────────────────────────────────────────
 

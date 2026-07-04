@@ -1,52 +1,101 @@
 """
 service_clients.py
-Returns client list and detail.
-Uses simulated data for MVP demo.
+==================
+Expone la lista de clientes y el detalle individual, tomando los datos
+del dataset analítico construido desde el DW real (service_data.py).
+
+La función import_dw_from_excel recarga el DW completo cuando el usuario
+sube un nuevo archivo desde la pantalla de Importar.
 """
 
-import random
+from __future__ import annotations
+
 from typing import Optional
+from app.services import service_data
 
-SEGMENTOS    = ["Corporativo", "PYME", "Residencial"]
-DEPARTAMENTOS = ["Lima", "Arequipa", "La Libertad", "Piura", "Cusco", "Junín", "Callao"]
-ESTADOS       = ["Activo", "Suspendido", "Baja"]
 
-random.seed(42)
-
-_CLIENTS = [
-    {
-        "id_cliente":       f"CLI-{str(i).zfill(4)}",
-        "nombre":           f"Cliente {i}",
-        "segmento":         random.choice(SEGMENTOS),
-        "departamento":     random.choice(DEPARTAMENTOS),
-        "antiguedad_meses": random.randint(3, 120),
-        "arpu":             round(random.uniform(80, 400), 2),
-        "churn":            1 if random.random() < 0.12 else 0,
-        "estado":           random.choices(ESTADOS, weights=[75, 15, 10])[0],
-    }
-    for i in range(1, 201)
-]
-
+# ─────────────────────────────────────────────────────────────────────────────
+# LECTURA DE CLIENTES
+# ─────────────────────────────────────────────────────────────────────────────
 
 def get_clients(
-    search: Optional[str] = None,
-    segmento: Optional[str] = None,
+    search:      Optional[str] = None,
+    segmento:    Optional[str] = None,
     departamento: Optional[str] = None,
 ) -> list[dict]:
-    result = _CLIENTS.copy()
+    """
+    Devuelve la lista de clientes del dataset analítico.
+    Soporta búsqueda por id_cliente / nombre y filtros de segmento / departamento.
+    """
+    if not service_data.is_loaded():
+        return []
+
+    df = service_data.get_df_model().copy()
 
     if search:
         s = search.lower()
-        result = [c for c in result if s in c["id_cliente"].lower() or s in c["nombre"].lower()]
+        df = df[
+            df["id_cliente"].str.lower().str.contains(s, na=False) |
+            df["nombre"].str.lower().str.contains(s, na=False)
+        ]
 
     if segmento:
-        result = [c for c in result if c["segmento"] == segmento]
+        df = df[df["segmento"] == segmento]
 
     if departamento:
-        result = [c for c in result if c["departamento"] == departamento]
+        df = df[df["departamento"] == departamento]
 
-    return result
+    # Columnas que necesita el frontend
+    cols = [
+        "id_cliente", "nombre", "segmento", "departamento",
+        "antiguedad_meses", "arpu", "churn", "estado",
+        "num_reclamos", "mttr_prom", "sat_media",
+        "total_averias", "pct_venc", "deuda_promedio", "max_dias_atraso",
+    ]
+    cols = [c for c in cols if c in df.columns]
+    return df[cols].to_dict(orient="records")
 
 
 def get_client_by_id(client_id: str) -> Optional[dict]:
-    return next((c for c in _CLIENTS if c["id_cliente"] == client_id), None)
+    if not service_data.is_loaded():
+        return None
+    df = service_data.get_df_model()
+    row = df[df["id_cliente"] == str(client_id)]
+    if row.empty:
+        return None
+    return row.iloc[0].to_dict()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORTACIÓN DEL DW COMPLETO
+# ─────────────────────────────────────────────────────────────────────────────
+
+def import_dw_from_excel(file_bytes: bytes) -> dict:
+    """
+    Recarga completamente el Data Warehouse desde un archivo Excel subido por
+    el usuario. El archivo debe tener las mismas hojas que Integratel_dw.xlsx:
+      DIM_TIEMPO, DIM_CLIENTE, DIM_PRODUCTO, DIM_NODO_RED, DIM_EMPLEADO,
+      FACT_FACTURACION, FACT_AVERIAS, FACT_CHURN, FACT_USO_RED
+
+    Retorna estadísticas de la carga para mostrarlas en la UI.
+    """
+    result = service_data.load_dw(source=file_bytes)
+
+    if result["status"] == "error":
+        return result
+
+    # Construir detalle de hojas para la tabla de resultados de la UI
+    sheets_info = [
+        {"hoja": "DIM_CLIENTE",     "filas": result.get("dim_cliente", 0),   "status": "ok"},
+        {"hoja": "FACT_FACTURACION","filas": result.get("fact_fact", 0),      "status": "ok"},
+        {"hoja": "FACT_AVERIAS",    "filas": result.get("fact_av", 0),        "status": "ok"},
+        {"hoja": "FACT_CHURN",      "filas": result.get("fact_churn", 0),     "status": "ok"},
+        {"hoja": "FACT_USO_RED",    "filas": result.get("fact_red", 0),       "status": "ok"},
+    ]
+
+    return {
+        "status":       "success",
+        "df_model_rows": result["df_model_rows"],
+        "churn_rate":   result["churn_rate"],
+        "sheets":       sheets_info,
+    }

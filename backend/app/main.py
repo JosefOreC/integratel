@@ -4,18 +4,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import router_dashboard, router_clients, router_predict, router_chat, router_reports
 from app.ml.predictor import load_model
+from app.services import service_data
 from pathlib import Path
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: load model once
+    # ── Cargar modelo XGBoost ──────────────────────────────────────
     model_path = Path(__file__).parent / "ml" / "model.joblib"
     if model_path.exists():
         load_model()
         print("[SUCCESS] Modelo XGBoost cargado correctamente.")
     else:
         print("[WARNING] model.joblib no encontrado. Endpoint /predict no disponible.")
+
+    # ── Cargar Data Warehouse ──────────────────────────────────────
+    result = service_data.load_dw()
+    if result["status"] == "ok":
+        print(f"[SUCCESS] DW cargado: {result['df_model_rows']:,} clientes | churn rate: {result['churn_rate']}%")
+    else:
+        print(f"[WARNING] DW no cargado: {result.get('message', 'error desconocido')}")
+
     yield
 
 

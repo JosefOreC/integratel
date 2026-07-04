@@ -125,7 +125,7 @@ export function DashboardPage() {
               <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
               <Tooltip
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
-                formatter={(v: number) => [v, "Eventos"]}
+                formatter={(v: any) => [v, "Eventos"]}
               />
               <Area
                 type="monotone"
@@ -163,7 +163,7 @@ export function DashboardPage() {
               </Pie>
               <Tooltip
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
-                formatter={(v: number) => [`${v}%`, "Participación"]}
+                formatter={(v: any) => [`${v}%`, "Participación"]}
               />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
@@ -186,7 +186,7 @@ export function DashboardPage() {
             <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
-              formatter={(v: number) => [v, "Clientes"]}
+              formatter={(v: any) => [v, "Clientes"]}
             />
             <Bar dataKey="value" fill={BAR_COLOR} radius={[4, 4, 0, 0]} maxBarSize={48} />
           </BarChart>

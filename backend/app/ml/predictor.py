@@ -56,7 +56,69 @@ _model = None
 def load_model() -> None:
     """Carga el modelo desde disco. Llamar una sola vez en startup."""
     global _model
-    _model = joblib.load(MODEL_PATH)
+    if MODEL_PATH.exists():
+        _model = joblib.load(MODEL_PATH)
+
+def retrain_model() -> dict:
+    """Re-entrena el modelo XGBoost utilizando los datos actuales del DW en memoria."""
+    from app.services import service_data
+    from imblearn.over_sampling import SMOTE
+    from sklearn.model_selection import train_test_split
+    from xgboost import XGBClassifier
+
+    df = service_data.get_df_model().copy()
+
+    # Codificar variables categóricas (usando el mismo mapeo estricto del sistema)
+    df["seg_enc"] = df["segmento"].apply(_encode_segmento)
+    df["dep_enc"] = df["departamento"].apply(_encode_departamento)
+
+    X = df[FEATURES]
+    y = df["churn"]
+
+    # Dividir y balancear
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.30, random_state=42, stratify=y
+    )
+
+    smote = SMOTE(random_state=42)
+    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+
+    # Configuración exacta del modelo original
+    clf = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="auc",
+        n_estimators=120,
+        max_depth=3,
+        learning_rate=0.03,
+        subsample=0.70,
+        colsample_bytree=0.70,
+        reg_alpha=2,
+        reg_lambda=4,
+        min_child_weight=8,
+        gamma=1,
+        random_state=42,
+    )
+
+    clf.fit(X_train_res, y_train_res)
+
+    # Guardar en disco y actualizar en memoria
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(clf, MODEL_PATH)
+    
+    global _model
+    _model = clf
+    
+    # Evaluar rendimiento rápido
+    from sklearn.metrics import roc_auc_score
+    y_prob = clf.predict_proba(X_test)[:, 1]
+    auc = roc_auc_score(y_test, y_prob)
+
+    return {
+        "status": "success",
+        "message": "Modelo entrenado correctamente",
+        "auc": round(auc, 4),
+        "train_samples": len(X_train_res)
+    }
 
 
 def _encode_segmento(segmento: str) -> int:
@@ -142,11 +204,11 @@ def run_prediction(
     cliente = pd.DataFrame([{
         "antiguedad_meses": antiguedad_meses,
         "num_reclamos":     num_reclamos,
-        "mttr_prom":        min(max(mttr_prom, 0), 500),   # clip igual al notebook
+        "mttr_prom":        mttr_prom,
         "sat_media":        sat_media,
         "total_averias":    total_averias,
         "arpu":             arpu,
-        "pct_venc":         min(max(pct_venc, 0), 100),    # clip igual al notebook
+        "pct_venc":         pct_venc,
         "deuda_promedio":   deuda_promedio,
         "max_dias_atraso":  max_dias_atraso,
         "seg_enc":          seg_enc,

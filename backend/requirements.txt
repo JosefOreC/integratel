@@ -10,3 +10,4 @@ imbalanced-learn
 pandas
 numpy
 openpyxl
+python-multipart

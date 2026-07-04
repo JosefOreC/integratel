@@ -5,6 +5,7 @@ import { ClientesPage } from "./pages/ClientesPage";
 import { PrediccionPage } from "./pages/PrediccionPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { ChatPage } from "./pages/ChatPage";
+import { ImportarPage } from "./pages/ImportarPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/prediccion" element={<PrediccionPage />} />
           <Route path="/reportes"   element={<ReportesPage />} />
           <Route path="/chat"       element={<ChatPage />} />
+          <Route path="/importar"  element={<ImportarPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

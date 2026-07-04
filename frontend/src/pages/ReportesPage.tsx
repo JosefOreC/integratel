@@ -1,24 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileDown, FileSpreadsheet, FileText, Users, AlertCircle, CheckCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
+import api from "../services/api";
+import type { Client, ApiResponse } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 interface ExportState { loading: boolean; done: boolean; error: string }
 const IDLE: ExportState = { loading: false, done: false, error: "" };
 
-const PREVIEW = [
-  { id: "CLI-0001", seg: "Residencial", dep: "Lima",      meses: 67,  arpu: 142.30, estado: "Activo",     churn: "No" },
-  { id: "CLI-0002", seg: "Corporativo", dep: "Arequipa",  meses: 104, arpu: 358.10, estado: "Activo",     churn: "No" },
-  { id: "CLI-0003", seg: "PYME",        dep: "Cusco",     meses: 22,  arpu: 210.50, estado: "Suspendido", churn: "Sí" },
-  { id: "CLI-0004", seg: "Residencial", dep: "Piura",     meses: 11,  arpu: 98.40,  estado: "Baja",       churn: "Sí" },
-  { id: "CLI-0005", seg: "PYME",        dep: "Lima",      meses: 88,  arpu: 275.00, estado: "Activo",     churn: "No" },
-];
-
 function ExportButton({
-  id, label, icon: Icon, color, url, ext,
+  id, label, icon: Icon, color, url, ext, total,
 }: {
-  id: string; label: string; icon: typeof FileDown; color: string; url: string; ext: string;
+  id: string; label: string; icon: typeof FileDown; color: string; url: string; ext: string; total: number;
 }) {
   const [st, setSt] = useState<ExportState>(IDLE);
 
@@ -47,7 +41,7 @@ function ExportButton({
       </div>
       <div>
         <h3 className="font-semibold text-gray-800">{label}</h3>
-        <p className="text-xs text-gray-400 mt-1">200 clientes · {ext.toUpperCase()}</p>
+        <p className="text-xs text-gray-400 mt-1">{total.toLocaleString()} clientes · {ext.toUpperCase()}</p>
       </div>
 
       {st.error && (
@@ -65,7 +59,7 @@ function ExportButton({
         id={id}
         className="btn-primary w-full justify-center"
         onClick={handleExport}
-        disabled={st.loading}
+        disabled={st.loading || total === 0}
       >
         <FileDown className="w-4 h-4" />
         {st.loading ? "Generando..." : `Exportar ${ext.toUpperCase()}`}
@@ -75,12 +69,24 @@ function ExportButton({
 }
 
 export function ReportesPage() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    api.get<ApiResponse<Client[]>>("/clients")
+      .then(res => {
+        setClients(res.data.data.slice(0, 5));
+        setTotal(res.data.data.length);
+      })
+      .catch(console.error);
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Stat banner */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total clientes",   value: "200",  Icon: Users        },
+          { label: "Total clientes",   value: total.toLocaleString(),  Icon: Users        },
           { label: "Formatos",         value: "CSV · Excel", Icon: FileText },
           { label: "Actualización",    value: "En tiempo real", Icon: FileDown },
         ].map(({ label, value, Icon }) => (
@@ -103,6 +109,7 @@ export function ReportesPage() {
           color="bg-green-600"
           url={`${API_URL}/reports/export/csv`}
           ext="csv"
+          total={total}
         />
         <ExportButton
           id="btn-export-excel"
@@ -111,6 +118,7 @@ export function ReportesPage() {
           color="bg-primary-600"
           url={`${API_URL}/reports/export/excel`}
           ext="xlsx"
+          total={total}
         />
       </div>
 
@@ -118,7 +126,7 @@ export function ReportesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Vista previa del reporte</CardTitle>
-          <span className="text-xs text-gray-400">Primeras 5 filas</span>
+          <span className="text-xs text-gray-400">Primeras 5 filas reales</span>
         </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -132,21 +140,28 @@ export function ReportesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {PREVIEW.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-mono text-primary-700 text-xs">{r.id}</td>
-                  <td className="px-4 py-2.5 text-gray-700">{r.seg}</td>
-                  <td className="px-4 py-2.5 text-gray-700">{r.dep}</td>
-                  <td className="px-4 py-2.5 text-gray-700">{r.meses} meses</td>
+              {clients.map((r) => (
+                <tr key={r.id_cliente} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-mono text-primary-700 text-xs">{r.id_cliente}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{r.segmento}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{r.departamento}</td>
+                  <td className="px-4 py-2.5 text-gray-700">{r.antiguedad_meses} meses</td>
                   <td className="px-4 py-2.5 text-gray-700">S/. {r.arpu}</td>
                   <td className="px-4 py-2.5 text-gray-700">{r.estado}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`font-medium ${r.churn === "Sí" ? "text-red-600" : "text-green-600"}`}>
-                      {r.churn}
+                    <span className={`font-medium ${r.churn === 1 ? "text-red-600" : "text-green-600"}`}>
+                      {r.churn === 1 ? "Sí" : "No"}
                     </span>
                   </td>
                 </tr>
               ))}
+              {clients.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    No hay datos cargados en el Data Warehouse.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

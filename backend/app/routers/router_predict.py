@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.schemas import PredictInput
-from app.ml.predictor import run_prediction, get_valid_options
+from app.ml.predictor import run_prediction, get_valid_options, retrain_model
 
 router = APIRouter()
 
@@ -19,3 +19,12 @@ def predict(payload: PredictInput):
 @router.get("/predict/options")
 def predict_options():
     return {"status": "ok", "message": "Opciones válidas", "data": get_valid_options()}
+
+
+@router.post("/predict/train")
+def train_model():
+    try:
+        result = retrain_model()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

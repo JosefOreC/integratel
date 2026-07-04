@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Brain, FileBarChart2, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, Brain, FileBarChart2, MessageSquare, FileUp } from "lucide-react";
 import { clsx } from "clsx";
 
 const nav = [
@@ -8,6 +8,7 @@ const nav = [
   { to: "/prediccion", label: "Predicción", Icon: Brain },
   { to: "/reportes",   label: "Reportes",   Icon: FileBarChart2 },
   { to: "/chat",       label: "Chat IA",    Icon: MessageSquare },
+  { to: "/importar",   label: "Importar",   Icon: FileUp },
 ];
 
 export function Sidebar() {

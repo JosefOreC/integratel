@@ -8,32 +8,18 @@ from app.services.service_clients import get_clients, get_client_by_id
 from app.services.service_dashboard import get_dashboard_data
 from app.ml.predictor import run_prediction, get_feature_importances
 
-# ── Perfil de cliente de alto riesgo para simulaciones ─────────
-_PROFILE_HIGH = {
-    "antiguedad_meses": 18, "num_reclamos": 7, "mttr_prom": 320,
-    "sat_media": 3, "total_averias": 6, "arpu": 120,
-    "pct_venc": 65, "deuda_promedio": 30, "max_dias_atraso": 45,
-    "segmento": "Residencial", "departamento": "Lima",
-}
-
-# ── Defaults para variables ausentes en el perfil de cliente ───
-_DEF_HIGH = {"num_reclamos": 7, "mttr_prom": 320, "sat_media": 3,
-             "total_averias": 6, "pct_venc": 65, "deuda_promedio": 30, "max_dias_atraso": 45}
-_DEF_LOW  = {"num_reclamos": 1, "mttr_prom": 90, "sat_media": 8.5,
-             "total_averias": 1, "pct_venc": 5,  "deuda_promedio": 5,  "max_dias_atraso": 0}
-
-
 def _pct(n: int, total: int) -> str:
     return f"{round(n / total * 100, 1)}%" if total else "N/A"
-
 
 def tool_kpi_summary() -> str:
     d = get_dashboard_data()
     k = d["kpis"]
+    if not k["total_clients"]:
+        return "El Data Warehouse no está cargado."
     seg = d["churn_by_segment"]
     dep = sorted(d["churn_by_dept"], key=lambda x: x["value"], reverse=True)
-    top_dep = dep[0]
-    top_seg = max(seg, key=lambda x: x["value"])
+    top_dep = dep[0] if dep else {"name": "N/A", "value": 0}
+    top_seg = max(seg, key=lambda x: x["value"]) if seg else {"name": "N/A", "value": 0}
 
     return (
         f"Estado actual del negocio — Integratel Perú\n\n"
@@ -56,7 +42,6 @@ def tool_kpi_summary() -> str:
         f"Se recomienda activar campañas de retención dirigidas al segmento {top_seg['name']} "
         f"en {top_dep['name']} como prioridad inmediata."
     )
-
 
 def tool_high_risk_analysis() -> str:
     clients = get_clients()
@@ -98,7 +83,6 @@ def tool_high_risk_analysis() -> str:
         f"clientes {top_seg} ubicados en {top_dep}."
     )
 
-
 def tool_segment_comparison() -> str:
     clients = get_clients()
     stats: dict[str, dict] = {}
@@ -110,6 +94,9 @@ def tool_segment_comparison() -> str:
         stats[s]["total"] += 1
         stats[s]["churn"] += c["churn"]
         stats[s]["arpu"] += c["arpu"]
+
+    if not stats:
+        return "No hay datos suficientes."
 
     lines = []
     ranked = sorted(stats.items(), key=lambda x: x[1]["churn"] / x[1]["total"] if x[1]["total"] else 0, reverse=True)
@@ -132,7 +119,6 @@ def tool_segment_comparison() -> str:
         f"Analizar qué hace diferente al segmento {low} para replicar esas condiciones."
     )
 
-
 def tool_dept_comparison(focus: str = "") -> str:
     clients = get_clients()
     stats: dict[str, dict] = {}
@@ -144,6 +130,9 @@ def tool_dept_comparison(focus: str = "") -> str:
         stats[d]["total"] += 1
         stats[d]["churn"] += c["churn"]
         stats[d]["arpu"] += c["arpu"]
+
+    if not stats:
+        return "No hay datos suficientes."
 
     ranked = sorted(stats.items(), key=lambda x: x[1]["churn"] / x[1]["total"] if x[1]["total"] else 0, reverse=True)
     lines = []
@@ -164,13 +153,10 @@ def tool_dept_comparison(focus: str = "") -> str:
         f"que puedan estar impulsando el churn en ese departamento."
     )
 
-
 def tool_analyze_client(client_id: str) -> str:
-    client = get_client_by_id(client_id.upper())
+    client = get_client_by_id(client_id.strip())
     if not client:
-        return f"No encontré al cliente {client_id.upper()}. Verifica el ID (formato: CLI-0001)."
-
-    defaults = _DEF_HIGH if client["churn"] == 1 else _DEF_LOW
+        return f"No encontré al cliente {client_id}. Verifica el ID (ej: 1, 2, 3)."
 
     try:
         result = run_prediction(
@@ -181,11 +167,17 @@ def tool_analyze_client(client_id: str) -> str:
                 "Arequipa","Cajamarca","Cusco","Ica","Junín","La Libertad",
                 "Lambayeque","Lima","Loreto","Piura","Puno","San Martín","Tacna","Tumbes","Ucayali","Áncash"
             ] else "Lima",
-            **defaults,
+            num_reclamos=client["num_reclamos"],
+            mttr_prom=client["mttr_prom"],
+            sat_media=client["sat_media"],
+            total_averias=client["total_averias"],
+            pct_venc=client["pct_venc"],
+            deuda_promedio=client["deuda_promedio"],
+            max_dias_atraso=client["max_dias_atraso"],
         )
         factors = ", ".join(result["factors"]) if result["factors"] else "ninguno crítico"
         return (
-            f"Análisis del Cliente {client_id.upper()}\n\n"
+            f"Análisis del Cliente {client_id}\n\n"
             f"👤 Perfil\n"
             f"• Segmento: {client['segmento']} | Departamento: {client['departamento']}\n"
             f"• Antigüedad: {client['antiguedad_meses']} meses | ARPU: S/. {client['arpu']:.2f}\n"
@@ -203,7 +195,6 @@ def tool_analyze_client(client_id: str) -> str:
     except Exception as e:
         return f"No pude ejecutar la predicción para {client_id}: {e}"
 
-
 def tool_explain_model() -> str:
     importances = get_feature_importances()
     if not importances:
@@ -217,7 +208,7 @@ def tool_explain_model() -> str:
     return (
         f"Variables del Modelo XGBoost — Integratel Perú\n\n"
         f"🧠 El modelo utiliza 11 variables para predecir el riesgo de churn.\n"
-        f"Fue entrenado con datos históricos 2020–2024 (50,000 clientes).\n\n"
+        f"Fue entrenado con datos históricos del DW.\n\n"
         f"📊 Variables más influyentes\n{lines}\n\n"
         f"🔍 Interpretación de negocio\n"
         f"Las variables operativas (MTTR, averías, reclamos) y financieras (ARPU, morosidad) "
@@ -227,19 +218,39 @@ def tool_explain_model() -> str:
         f"⚙️ Umbral de decisión: 60% de probabilidad → se clasifica como churn"
     )
 
-
 def tool_simulate(msg: str) -> str:
     msg_lower = msg.lower()
-    profile = _PROFILE_HIGH.copy()
+    clients = get_clients()
+    
+    if not clients:
+        return "No hay clientes cargados en el Data Warehouse para simular."
+        
+    # Obtener el cliente con mayor riesgo real de la base de datos
+    def _risk_score(c):
+        return (c["num_reclamos"] * 0.35 + (c["pct_venc"]/10) * 0.35 + (10 - c["sat_media"]) * 0.30)
+        
+    worst_client = max(clients, key=_risk_score)
+    
+    profile = {
+        "antiguedad_meses": worst_client["antiguedad_meses"],
+        "num_reclamos": worst_client["num_reclamos"],
+        "mttr_prom": worst_client["mttr_prom"],
+        "sat_media": worst_client["sat_media"],
+        "total_averias": worst_client["total_averias"],
+        "arpu": worst_client["arpu"],
+        "pct_venc": worst_client["pct_venc"],
+        "deuda_promedio": worst_client["deuda_promedio"],
+        "max_dias_atraso": worst_client["max_dias_atraso"],
+        "segmento": worst_client["segmento"] if worst_client["segmento"] in ["Corporativo", "PYME", "Residencial"] else "Residencial",
+        "departamento": worst_client["departamento"] if worst_client["departamento"] in ["Arequipa","Lima","Cusco"] else "Lima",
+    }
 
     scenarios = {
-        "mttr":         ("mttr_prom",       320, 100,  "MTTR promedio",              "de 320 min a 100 min"),
-        "satisfacción": ("sat_media",        3,   8,    "Satisfacción del cliente",   "de 3 a 8 (sobre 10)"),
-        "reclamos":     ("num_reclamos",     7,   2,    "N° de reclamos",             "de 7 a 2"),
-        "morosidad":    ("pct_venc",         65,  10,   "% facturas vencidas",        "de 65% a 10%"),
-        "deuda":        ("deuda_promedio",   30,  5,    "Deuda promedio",             "de 30 a 5 días"),
-        "arpu":         ("arpu",             120, 250,  "ARPU",                       "de S/. 120 a S/. 250"),
-        "averías":      ("total_averias",    6,   1,    "Total de averías",           "de 6 a 1"),
+        "mttr":         ("mttr_prom",       profile["mttr_prom"], max(0, profile["mttr_prom"] - 100), "MTTR promedio", f"de {profile['mttr_prom']} min a {max(0, profile['mttr_prom'] - 100)} min"),
+        "satisfacción": ("sat_media",        profile["sat_media"], min(10, profile["sat_media"] + 3),  "Satisfacción del cliente", f"de {profile['sat_media']} a {min(10, profile['sat_media'] + 3)}"),
+        "reclamos":     ("num_reclamos",     profile["num_reclamos"], max(0, profile["num_reclamos"] - 3), "N° de reclamos", f"de {profile['num_reclamos']} a {max(0, profile['num_reclamos'] - 3)}"),
+        "morosidad":    ("pct_venc",         profile["pct_venc"], max(0, profile["pct_venc"] - 30), "% facturas vencidas", f"de {profile['pct_venc']}% a {max(0, profile['pct_venc'] - 30)}%"),
+        "averías":      ("total_averias",    profile["total_averias"], max(0, profile["total_averias"] - 2), "Total de averías", f"de {profile['total_averias']} a {max(0, profile['total_averias'] - 2)}"),
     }
 
     chosen = None
@@ -262,8 +273,8 @@ def tool_simulate(msg: str) -> str:
         direction = "reduce" if delta > 0 else "aumenta"
 
         return (
-            f"Simulación: Impacto de mejorar {var_label}\n\n"
-            f"📋 Perfil base: cliente residencial de alto riesgo en Lima\n"
+            f"Simulación Dinámica: Impacto de mejorar {var_label}\n\n"
+            f"📋 Perfil base: Cliente real #{worst_client['id_cliente']} ({profile['segmento']} en {profile['departamento']})\n"
             f"• Cambio simulado: {var_label} {change_desc}\n\n"
             f"📊 Resultado\n"
             f"• Antes: {round(before['probability']*100,1)}% de probabilidad → Riesgo {before['risk']}\n"

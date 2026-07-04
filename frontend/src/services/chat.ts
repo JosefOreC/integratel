@@ -1,5 +1,5 @@
 import api from "./api";
-import type { ApiResponse, ChatMessage } from "../types";
+import type { ApiResponse } from "../types";
 
 export const sendChat = (message: string) =>
   api.post<ApiResponse<{ reply: string }>>("/chat", { message });
